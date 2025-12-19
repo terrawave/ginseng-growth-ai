@@ -251,7 +251,7 @@ names: {self.classes}
 
         return str(yaml_path)
 
-    async def start_training(self, epochs: int = 50, base_model: str = "yolov8n.pt") -> bool:
+    async def start_training(self, epochs: int = 50, base_model: str = "yolov8n.pt", use_pretrained: bool = True) -> bool:
         """학습 시작"""
         if self.is_training:
             print("[Training] 이미 학습 중입니다")
@@ -286,19 +286,43 @@ names: {self.classes}
         """실제 학습 실행 (비동기)"""
         try:
             from ultralytics import YOLO
+            from ultralytics.utils import callbacks
 
-            # 베이스 모델 로드
-            if Path(f"models/{base_model}").exists():
-                model = YOLO(f"models/{base_model}")
-            else:
-                model = YOLO(base_model)
+            # 베이스 모델 로드 (항상 새로운 pretrained 모델 사용)
+            # 기존 커스텀 모델은 클래스 수가 다를 수 있으므로 사용하지 않음
+            print(f"[Training] YOLOv8 pretrained 모델 로드: {base_model}")
+            model = YOLO(base_model)  # ultralytics에서 자동 다운로드
 
             print(f"[Training] 학습 시작: epochs={epochs}, base={base_model}")
+
+            # 진행 상황 추적을 위한 참조
+            manager = self
+
+            # 콜백 함수 정의
+            def on_train_epoch_end(trainer):
+                manager.current_epoch = trainer.epoch + 1
+                manager.training_progress = int((trainer.epoch + 1) / epochs * 100)
+                manager.training_status = f"학습 중: {manager.current_epoch}/{epochs} 에포크"
+                metrics = trainer.metrics if hasattr(trainer, 'metrics') else {}
+                box_loss = metrics.get('train/box_loss', 0)
+                cls_loss = metrics.get('train/cls_loss', 0)
+                print(f"[Training] Epoch {manager.current_epoch}/{epochs} - box_loss: {box_loss:.4f}, cls_loss: {cls_loss:.4f}")
+
+            def on_train_batch_end(trainer):
+                # 배치 단위로 더 세밀한 진행률 계산
+                if hasattr(trainer, 'epoch') and hasattr(trainer, 'batch_i'):
+                    batch_progress = (trainer.batch_i + 1) / len(trainer.train_loader) if hasattr(trainer, 'train_loader') else 0
+                    epoch_progress = (trainer.epoch + batch_progress) / epochs * 100
+                    manager.training_progress = min(int(epoch_progress), 99)
 
             # 학습 실행 (별도 스레드에서)
             loop = asyncio.get_event_loop()
 
             def train_sync():
+                # 콜백 등록
+                model.add_callback("on_train_epoch_end", on_train_epoch_end)
+                model.add_callback("on_train_batch_end", on_train_batch_end)
+
                 results = model.train(
                     data=data_yaml,
                     epochs=epochs,

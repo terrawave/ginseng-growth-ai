@@ -320,16 +320,41 @@
                     </div>
                 </div>
 
-                <div style="display:flex; gap:10px; align-items:center; margin-bottom:15px">
-                    <label>에포크:</label>
+                <div style="display:flex; gap:15px; align-items:center; margin-bottom:20px; flex-wrap:wrap">
+                    <label style="font-size:1.1rem">에포크:</label>
                     <input type="number" id="epochsInput" value="50" min="10" max="300"
-                           style="width:80px; padding:8px; border-radius:4px; border:none; background:var(--card); color:white">
+                           style="width:100px; padding:12px; border-radius:6px; border:none; background:var(--card); color:white; font-size:1.1rem">
                     <button class="btn btn-primary" onclick="startTraining()" id="trainBtn">학습 시작</button>
-                    <span id="trainingStatus" style="margin-left:20px; color:var(--text-dim)"></span>
+                    <button class="btn btn-danger" onclick="stopTraining()" id="stopBtn" style="display:none">학습 중지</button>
                 </div>
 
-                <div class="progress-bar">
-                    <div class="progress-fill" id="trainingProgress" style="width:0%"></div>
+                <!-- 학습 진행 상태 표시 -->
+                <div id="trainingInfo" style="background:var(--card); border-radius:12px; padding:20px; margin-bottom:20px; display:none">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px">
+                        <span id="trainingStatus" style="font-size:1.3rem; font-weight:bold; color:#4caf50"></span>
+                        <span id="trainingPercent" style="font-size:2rem; font-weight:bold; color:#00ff88">0%</span>
+                    </div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="trainingProgress" style="width:0%"></div>
+                    </div>
+                    <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:15px; margin-top:15px">
+                        <div style="text-align:center">
+                            <div style="font-size:1.8rem; font-weight:bold; color:#4fc3f7" id="currentEpoch">0</div>
+                            <div style="color:var(--text-dim)">현재 에포크</div>
+                        </div>
+                        <div style="text-align:center">
+                            <div style="font-size:1.8rem; font-weight:bold; color:#4fc3f7" id="totalEpochs">0</div>
+                            <div style="color:var(--text-dim)">전체 에포크</div>
+                        </div>
+                        <div style="text-align:center">
+                            <div style="font-size:1.8rem; font-weight:bold; color:#4fc3f7" id="elapsedTime">00:00</div>
+                            <div style="color:var(--text-dim)">경과 시간</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="progress-bar" id="simpleProgress">
+                    <div class="progress-fill" id="trainingProgressSimple" style="width:0%"></div>
                 </div>
             </div>
 
@@ -604,6 +629,9 @@
         }
 
         // 학습 시작
+        let trainingStartTime = null;
+        let elapsedInterval = null;
+
         async function startTraining() {
             const epochs = parseInt(document.getElementById('epochsInput').value);
             if (epochs < 10) return alert('최소 10 에포크 필요');
@@ -613,12 +641,46 @@
                 const data = await res.json();
                 if (data.success) {
                     document.getElementById('trainBtn').disabled = true;
+                    document.getElementById('trainBtn').style.display = 'none';
+                    document.getElementById('stopBtn').style.display = 'inline-block';
+                    document.getElementById('trainingInfo').style.display = 'block';
+                    document.getElementById('simpleProgress').style.display = 'none';
+                    document.getElementById('totalEpochs').textContent = epochs;
+
+                    trainingStartTime = Date.now();
+                    startElapsedTimer();
                     pollTrainingStatus();
                 } else {
                     alert(data.error || '학습 시작 실패');
                 }
             } catch (e) {
                 console.error('학습 시작 실패:', e);
+            }
+        }
+
+        function startElapsedTimer() {
+            elapsedInterval = setInterval(() => {
+                if (trainingStartTime) {
+                    const elapsed = Math.floor((Date.now() - trainingStartTime) / 1000);
+                    const mins = Math.floor(elapsed / 60);
+                    const secs = elapsed % 60;
+                    document.getElementById('elapsedTime').textContent =
+                        `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+                }
+            }, 1000);
+        }
+
+        function stopElapsedTimer() {
+            if (elapsedInterval) {
+                clearInterval(elapsedInterval);
+                elapsedInterval = null;
+            }
+        }
+
+        async function stopTraining() {
+            if (confirm('학습을 중지하시겠습니까?')) {
+                // 학습 중지는 서버에서 구현 필요
+                alert('학습 중지는 현재 지원되지 않습니다. 완료될 때까지 기다려주세요.');
             }
         }
 
@@ -629,6 +691,13 @@
                 const data = await res.json();
                 updateTrainingUI(data);
                 if (data.is_training) {
+                    document.getElementById('trainBtn').disabled = true;
+                    document.getElementById('trainBtn').style.display = 'none';
+                    document.getElementById('stopBtn').style.display = 'inline-block';
+                    document.getElementById('trainingInfo').style.display = 'block';
+                    document.getElementById('simpleProgress').style.display = 'none';
+                    trainingStartTime = Date.now();
+                    startElapsedTimer();
                     pollTrainingStatus();
                 }
             } catch (e) {}
@@ -643,16 +712,32 @@
 
                     if (!data.is_training) {
                         clearInterval(interval);
+                        stopElapsedTimer();
                         document.getElementById('trainBtn').disabled = false;
+                        document.getElementById('trainBtn').style.display = 'inline-block';
+                        document.getElementById('stopBtn').style.display = 'none';
+
+                        if (data.status === 'completed') {
+                            document.getElementById('trainingStatus').textContent = '학습 완료!';
+                            document.getElementById('trainingStatus').style.color = '#00ff88';
+                            alert('학습이 완료되었습니다! 새 모델이 저장되었습니다.');
+                        } else if (data.status.startsWith('error')) {
+                            document.getElementById('trainingStatus').style.color = '#ff5252';
+                        }
+
                         loadModels();
                     }
                 } catch (e) {}
-            }, 2000);
+            }, 1000);  // 1초마다 업데이트
         }
 
         function updateTrainingUI(data) {
             document.getElementById('trainingStatus').textContent = data.status;
             document.getElementById('trainingProgress').style.width = `${data.progress}%`;
+            document.getElementById('trainingProgressSimple').style.width = `${data.progress}%`;
+            document.getElementById('trainingPercent').textContent = `${data.progress}%`;
+            document.getElementById('currentEpoch').textContent = data.current_epoch || 0;
+            document.getElementById('totalEpochs').textContent = data.total_epochs || 0;
         }
 
         // 모델 목록 로드

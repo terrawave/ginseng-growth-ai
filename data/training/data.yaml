@@ -1,0 +1,7 @@
+# Ginseng Growth Dataset
+path: /Users/terracube010/ginseng-growth-ai/data/training
+train: train/images
+val: val/images
+
+nc: 3
+names: ['발아기', '생장기', '수확기']
