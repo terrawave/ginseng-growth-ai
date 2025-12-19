@@ -1,0 +1,20 @@
+# 새싹인삼 생육 인식 시스템 의존성
+# Ginseng Growth AI Dependencies
+
+# 웹 서버
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+aiohttp>=3.9.0
+
+# 시리얼 통신 (옵션)
+pyserial>=3.5
+
+# 카메라 및 이미지 처리
+opencv-python>=4.8.0
+
+# YOLO 모델
+ultralytics>=8.0.0
+
+# 유틸리티
+numpy>=1.24.0
+python-multipart>=0.0.6

@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>새싹인삼 생육 AI</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <div class="dashboard">
+        <!-- 헤더 -->
+        <header class="header">
+            <h1>새싹인삼 생육 AI</h1>
+            <a href="/training" style="background:#1565c0; color:white; padding:6px 12px; border-radius:6px; text-decoration:none; font-size:0.8rem;">모델 학습</a>
+            <div class="status-indicators">
+                <span id="connection-status" class="indicator disconnected">연결중...</span>
+                <span id="auto-status" class="indicator">자동: OFF</span>
+            </div>
+        </header>
+
+        <!-- 메인 그리드 -->
+        <main class="main-grid">
+            <!-- 좌측: 카메라 + 인식정보 -->
+            <section class="camera-panel">
+                <div class="camera-wrapper">
+                    <img id="camera-feed" src="/api/camera/stream" alt="Camera">
+                    <div class="detection-overlay">
+                        <div id="detection-badge" class="badge unknown">
+                            <span class="stage">대기</span>
+                            <span class="conf">-</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="detection-details">
+                    <div class="detail-item">
+                        <span class="label">단계</span>
+                        <span class="value" id="det-stage">-</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="label">신뢰도</span>
+                        <span class="value" id="det-conf">-</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="label">위치</span>
+                        <span class="value small" id="det-bbox">-</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="label">인식수</span>
+                        <span class="value" id="det-count">0</span>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 중앙: 센서 + 목표값 -->
+            <section class="sensor-panel">
+                <h2>센서 / 목표</h2>
+                <div class="sensor-rows">
+                    <!-- EC -->
+                    <div class="sensor-row">
+                        <div class="sensor-header">
+                            <div class="sensor-info">
+                                <span class="sensor-name">EC</span>
+                                <span class="sensor-value" id="ec-value">-</span>
+                                <span class="sensor-unit">mS/cm</span>
+                            </div>
+                            <div class="sensor-status" id="ec-status">-</div>
+                        </div>
+                        <div class="target-bar">
+                            <div class="bar-track">
+                                <div class="bar-target" id="ec-target-bar"></div>
+                                <div class="bar-current" id="ec-current-bar"></div>
+                            </div>
+                            <span class="target-text" id="ec-target">목표: -</span>
+                        </div>
+                    </div>
+                    <!-- pH -->
+                    <div class="sensor-row">
+                        <div class="sensor-header">
+                            <div class="sensor-info">
+                                <span class="sensor-name">pH</span>
+                                <span class="sensor-value" id="ph-value">-</span>
+                                <span class="sensor-unit"></span>
+                            </div>
+                            <div class="sensor-status" id="ph-status">-</div>
+                        </div>
+                        <div class="target-bar">
+                            <div class="bar-track">
+                                <div class="bar-target" id="ph-target-bar"></div>
+                                <div class="bar-current" id="ph-current-bar"></div>
+                            </div>
+                            <span class="target-text" id="ph-target">목표: -</span>
+                        </div>
+                    </div>
+                    <!-- 수온 -->
+                    <div class="sensor-row">
+                        <div class="sensor-header">
+                            <div class="sensor-info">
+                                <span class="sensor-name">수온</span>
+                                <span class="sensor-value" id="temp-value">-</span>
+                                <span class="sensor-unit">°C</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 생장단계 카드 -->
+                <div class="stage-cards">
+                    <div class="stage-card" data-stage="germination">
+                        <div class="stage-name">발아기</div>
+                        <div class="stage-range">EC 0.8-1.2 | pH 5.8-6.2</div>
+                    </div>
+                    <div class="stage-card" data-stage="growth">
+                        <div class="stage-name">생장기</div>
+                        <div class="stage-range">EC 1.4-1.8 | pH 5.5-6.0</div>
+                    </div>
+                    <div class="stage-card" data-stage="harvest">
+                        <div class="stage-name">수확기</div>
+                        <div class="stage-range">EC 1.2-1.5 | pH 5.5-6.0</div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 우측: 제어 + 로그 -->
+            <section class="control-panel">
+                <h2>양액 제어</h2>
+
+                <!-- 자동 제어 토글 -->
+                <div class="auto-toggle">
+                    <label class="switch">
+                        <input type="checkbox" id="auto-toggle">
+                        <span class="slider"></span>
+                    </label>
+                    <span class="toggle-label">자동 제어</span>
+                </div>
+
+                <!-- 펌프 버튼 -->
+                <div class="pump-buttons">
+                    <div class="pump-group">
+                        <button class="pump-btn" id="pump-ab-btn" data-pump="nutrient_ab">
+                            <span class="pump-name">양액AB</span>
+                            <span class="pump-action">EC↑</span>
+                            <span class="pump-status">OFF</span>
+                        </button>
+                        <div class="cooldown" id="ab-cooldown"></div>
+                    </div>
+                    <div class="pump-group">
+                        <button class="pump-btn" id="pump-c-btn" data-pump="nutrient_c">
+                            <span class="pump-name">양액C</span>
+                            <span class="pump-action">pH↓</span>
+                            <span class="pump-status">OFF</span>
+                        </button>
+                        <div class="cooldown" id="c-cooldown"></div>
+                    </div>
+                    <div class="pump-group">
+                        <button class="pump-btn" id="pump-mixer-btn" data-pump="mixer">
+                            <span class="pump-name">교반기</span>
+                            <span class="pump-action">MIX</span>
+                            <span class="pump-status">OFF</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 제어 로그 -->
+                <div class="log-section">
+                    <h3>로그</h3>
+                    <div class="log-container" id="log-container"></div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <script src="/static/js/app.js?v=2"></script>
+</body>
+</html>

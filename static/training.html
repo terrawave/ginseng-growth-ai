@@ -1,0 +1,708 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YOLO 모델 학습</title>
+    <style>
+        :root {
+            --primary: #2e7d32;
+            --secondary: #1565c0;
+            --danger: #d32f2f;
+            --warning: #ff9800;
+            --bg: #1a1a2e;
+            --panel: #16213e;
+            --card: #0f3460;
+            --text: #eaeaea;
+            --text-dim: #a0a0a0;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 1800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding: 15px;
+            background: var(--panel);
+            border-radius: 10px;
+        }
+        header h1 { color: var(--primary); font-size: 1.8rem; }
+        .nav-links a {
+            color: var(--text);
+            text-decoration: none;
+            margin-left: 20px;
+            padding: 8px 16px;
+            background: var(--card);
+            border-radius: 6px;
+        }
+        .nav-links a:hover { background: var(--secondary); }
+
+        /* 그리드 레이아웃 */
+        .main-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        .panel {
+            background: var(--panel);
+            border-radius: 10px;
+            padding: 15px;
+        }
+        .panel h2 {
+            color: var(--primary);
+            font-size: 1.4rem;
+            margin-bottom: 20px;
+            padding-bottom: 12px;
+            border-bottom: 2px solid var(--card);
+        }
+
+        /* 카메라 패널 */
+        .camera-container {
+            position: relative;
+            background: #000;
+            border-radius: 8px;
+            overflow: hidden;
+            margin-bottom: 15px;
+        }
+        .camera-container img {
+            width: 100%;
+            height: 450px;
+            object-fit: contain;
+        }
+        .btn {
+            padding: 14px 28px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 1rem;
+            transition: all 0.2s;
+        }
+        .btn-primary { background: var(--primary); color: white; }
+        .btn-secondary { background: var(--secondary); color: white; }
+        .btn-danger { background: var(--danger); color: white; }
+        .btn-warning { background: var(--warning); color: black; }
+        .btn:hover { opacity: 0.9; transform: translateY(-2px); }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        /* 이미지 갤러리 */
+        .gallery {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 12px;
+            max-height: 350px;
+            overflow-y: auto;
+            padding: 5px;
+        }
+        .gallery-item {
+            position: relative;
+            aspect-ratio: 1;
+            border-radius: 8px;
+            overflow: hidden;
+            cursor: pointer;
+            border: 3px solid transparent;
+            transition: transform 0.2s, border-color 0.2s;
+        }
+        .gallery-item:hover { transform: scale(1.02); }
+        .gallery-item.selected { border-color: var(--primary); box-shadow: 0 0 15px rgba(46,125,50,0.5); }
+        .gallery-item.labeled::after {
+            content: "✓";
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            background: var(--primary);
+            color: white;
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+            font-weight: bold;
+        }
+        .gallery-item img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        /* 라벨링 캔버스 */
+        .label-container {
+            position: relative;
+            background: #000;
+            border-radius: 8px;
+            overflow: hidden;
+            min-height: 500px;
+        }
+        #labelCanvas {
+            width: 100%;
+            height: 500px;
+            cursor: crosshair;
+        }
+        .class-buttons {
+            display: flex;
+            gap: 15px;
+            margin: 20px 0;
+        }
+        .class-btn {
+            flex: 1;
+            padding: 18px;
+            border: 3px solid transparent;
+            border-radius: 10px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 1.1rem;
+            transition: all 0.2s;
+        }
+        .class-btn.germination { background: rgba(76,175,80,0.3); color: #81c784; }
+        .class-btn.growth { background: rgba(255,235,59,0.3); color: #fff176; }
+        .class-btn.harvest { background: rgba(255,152,0,0.3); color: #ffb74d; }
+        .class-btn.selected { border-color: white; transform: scale(1.05); }
+
+        /* 라벨 목록 */
+        .labels-list {
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        .label-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 15px;
+            background: var(--card);
+            border-radius: 6px;
+            margin-bottom: 8px;
+            font-size: 1rem;
+        }
+        .label-item .delete-btn {
+            background: var(--danger);
+            border: none;
+            color: white;
+            padding: 8px 14px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.9rem;
+        }
+
+        /* 학습 섹션 */
+        .training-section {
+            margin-top: 20px;
+        }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        .stat-item {
+            background: var(--card);
+            padding: 25px;
+            border-radius: 12px;
+            text-align: center;
+        }
+        .stat-value { font-size: 2.5rem; font-weight: bold; color: var(--primary); }
+        .stat-label { font-size: 1rem; color: var(--text-dim); margin-top: 5px; }
+
+        .progress-bar {
+            height: 30px;
+            background: var(--card);
+            border-radius: 15px;
+            overflow: hidden;
+            margin: 20px 0;
+        }
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--primary), var(--secondary));
+            transition: width 0.3s;
+        }
+
+        /* 모델 목록 */
+        .models-list {
+            max-height: 250px;
+            overflow-y: auto;
+        }
+        .model-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 18px 20px;
+            background: var(--card);
+            border-radius: 10px;
+            margin-bottom: 12px;
+        }
+        .model-item.active { border-left: 4px solid var(--primary); }
+        .model-info { flex: 1; }
+        .model-name { font-weight: bold; font-size: 1.1rem; }
+        .model-meta { font-size: 0.95rem; color: var(--text-dim); margin-top: 5px; }
+
+        .action-buttons { display: flex; gap: 15px; margin-top: 20px; }
+        .full-width { grid-column: 1 / -1; }
+        .panel { padding: 25px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>YOLO 모델 학습</h1>
+            <div class="nav-links">
+                <a href="/">대시보드</a>
+            </div>
+        </header>
+
+        <div class="main-grid">
+            <!-- 좌측: 캡처 & 갤러리 -->
+            <div class="panel">
+                <h2>이미지 캡처</h2>
+                <div class="camera-container">
+                    <img id="cameraPreview" src="/api/camera/stream" alt="Camera">
+                </div>
+                <button class="btn btn-primary" onclick="captureImage()" style="width:100%">
+                    이미지 캡처
+                </button>
+
+                <h2 style="margin-top:20px">캡처된 이미지</h2>
+                <div class="gallery" id="imageGallery"></div>
+            </div>
+
+            <!-- 우측: 라벨링 -->
+            <div class="panel">
+                <h2>라벨링</h2>
+                <div class="label-container">
+                    <canvas id="labelCanvas" width="800" height="600"></canvas>
+                </div>
+
+                <div class="class-buttons">
+                    <button class="class-btn germination" data-class="0" onclick="selectClass(0)">발아기</button>
+                    <button class="class-btn growth" data-class="1" onclick="selectClass(1)">생장기</button>
+                    <button class="class-btn harvest" data-class="2" onclick="selectClass(2)">수확기</button>
+                </div>
+
+                <div class="labels-list" id="labelsList"></div>
+
+                <div class="action-buttons">
+                    <button class="btn btn-primary" onclick="saveLabels()" style="flex:1">라벨 저장</button>
+                    <button class="btn btn-danger" onclick="clearLabels()">초기화</button>
+                    <button class="btn btn-danger" onclick="deleteImage()">삭제</button>
+                </div>
+            </div>
+
+            <!-- 학습 섹션 -->
+            <div class="panel full-width training-section">
+                <h2>모델 학습</h2>
+                <div class="stats-grid">
+                    <div class="stat-item">
+                        <div class="stat-value" id="totalImages">0</div>
+                        <div class="stat-label">전체 이미지</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" id="labeledImages">0</div>
+                        <div class="stat-label">라벨링 완료</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" id="unlabeledImages">0</div>
+                        <div class="stat-label">미완료</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" id="modelsCount">0</div>
+                        <div class="stat-label">모델 수</div>
+                    </div>
+                </div>
+
+                <div style="display:flex; gap:10px; align-items:center; margin-bottom:15px">
+                    <label>에포크:</label>
+                    <input type="number" id="epochsInput" value="50" min="10" max="300"
+                           style="width:80px; padding:8px; border-radius:4px; border:none; background:var(--card); color:white">
+                    <button class="btn btn-primary" onclick="startTraining()" id="trainBtn">학습 시작</button>
+                    <span id="trainingStatus" style="margin-left:20px; color:var(--text-dim)"></span>
+                </div>
+
+                <div class="progress-bar">
+                    <div class="progress-fill" id="trainingProgress" style="width:0%"></div>
+                </div>
+            </div>
+
+            <!-- 모델 관리 -->
+            <div class="panel full-width">
+                <h2>모델 관리</h2>
+                <div class="models-list" id="modelsList"></div>
+                <div class="action-buttons">
+                    <button class="btn btn-secondary" onclick="reloadModel()">현재 모델 리로드</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 상태
+        let currentImageId = null;
+        let currentLabels = [];
+        let selectedClass = 0;
+        let isDrawing = false;
+        let startX, startY;
+        let canvas, ctx;
+        let currentImage = null;
+
+        const classNames = ['발아기', '생장기', '수확기'];
+        const classColors = ['#4caf50', '#ffeb3b', '#ff9800'];
+
+        // 초기화
+        document.addEventListener('DOMContentLoaded', () => {
+            canvas = document.getElementById('labelCanvas');
+            ctx = canvas.getContext('2d');
+            setupCanvas();
+            loadImages();
+            loadModels();
+            checkTrainingStatus();
+        });
+
+        // 캔버스 설정
+        function setupCanvas() {
+            canvas.addEventListener('mousedown', startDraw);
+            canvas.addEventListener('mousemove', drawing);
+            canvas.addEventListener('mouseup', endDraw);
+            canvas.addEventListener('mouseleave', endDraw);
+        }
+
+        function startDraw(e) {
+            if (!currentImageId) return;
+            isDrawing = true;
+            const rect = canvas.getBoundingClientRect();
+            startX = (e.clientX - rect.left) * (canvas.width / rect.width);
+            startY = (e.clientY - rect.top) * (canvas.height / rect.height);
+        }
+
+        function drawing(e) {
+            if (!isDrawing) return;
+            const rect = canvas.getBoundingClientRect();
+            const x = (e.clientX - rect.left) * (canvas.width / rect.width);
+            const y = (e.clientY - rect.top) * (canvas.height / rect.height);
+
+            redrawCanvas();
+            ctx.strokeStyle = classColors[selectedClass];
+            ctx.lineWidth = 2;
+            ctx.strokeRect(startX, startY, x - startX, y - startY);
+        }
+
+        function endDraw(e) {
+            if (!isDrawing) return;
+            isDrawing = false;
+
+            const rect = canvas.getBoundingClientRect();
+            const endX = (e.clientX - rect.left) * (canvas.width / rect.width);
+            const endY = (e.clientY - rect.top) * (canvas.height / rect.height);
+
+            const x1 = Math.min(startX, endX);
+            const y1 = Math.min(startY, endY);
+            const x2 = Math.max(startX, endX);
+            const y2 = Math.max(startY, endY);
+
+            const w = x2 - x1;
+            const h = y2 - y1;
+
+            if (w > 10 && h > 10) {
+                // YOLO 형식으로 변환 (정규화)
+                const xCenter = (x1 + w/2) / canvas.width;
+                const yCenter = (y1 + h/2) / canvas.height;
+                const normW = w / canvas.width;
+                const normH = h / canvas.height;
+
+                currentLabels.push({
+                    class_id: selectedClass,
+                    bbox: [xCenter, yCenter, normW, normH],
+                    pixel_bbox: [x1, y1, x2, y2]
+                });
+                updateLabelsUI();
+            }
+            redrawCanvas();
+        }
+
+        function redrawCanvas() {
+            if (!currentImage) {
+                ctx.fillStyle = '#000';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                return;
+            }
+
+            ctx.drawImage(currentImage, 0, 0, canvas.width, canvas.height);
+
+            // 라벨 그리기
+            currentLabels.forEach((label, idx) => {
+                const [x1, y1, x2, y2] = label.pixel_bbox;
+                ctx.strokeStyle = classColors[label.class_id];
+                ctx.lineWidth = 2;
+                ctx.strokeRect(x1, y1, x2 - x1, y2 - y1);
+
+                // 라벨 텍스트
+                ctx.fillStyle = classColors[label.class_id];
+                ctx.fillRect(x1, y1 - 20, 60, 20);
+                ctx.fillStyle = '#000';
+                ctx.font = '12px sans-serif';
+                ctx.fillText(classNames[label.class_id], x1 + 5, y1 - 6);
+            });
+        }
+
+        function selectClass(classId) {
+            selectedClass = classId;
+            document.querySelectorAll('.class-btn').forEach(btn => {
+                btn.classList.toggle('selected', parseInt(btn.dataset.class) === classId);
+            });
+        }
+
+        function updateLabelsUI() {
+            const list = document.getElementById('labelsList');
+            list.innerHTML = currentLabels.map((label, idx) => `
+                <div class="label-item">
+                    <span style="color:${classColors[label.class_id]}">${classNames[label.class_id]}</span>
+                    <button class="delete-btn" onclick="deleteLabel(${idx})">X</button>
+                </div>
+            `).join('');
+        }
+
+        function deleteLabel(idx) {
+            currentLabels.splice(idx, 1);
+            updateLabelsUI();
+            redrawCanvas();
+        }
+
+        function clearLabels() {
+            currentLabels = [];
+            updateLabelsUI();
+            redrawCanvas();
+        }
+
+        // 이미지 캡처
+        async function captureImage() {
+            try {
+                const res = await fetch('/api/training/capture', { method: 'POST' });
+                const data = await res.json();
+                if (data.success) {
+                    loadImages();
+                    selectImage(data.image_id);
+                }
+            } catch (e) {
+                console.error('캡처 실패:', e);
+            }
+        }
+
+        // 이미지 목록 로드
+        async function loadImages() {
+            try {
+                const res = await fetch('/api/training/images');
+                const data = await res.json();
+
+                // 통계 업데이트
+                document.getElementById('totalImages').textContent = data.stats.total_images;
+                document.getElementById('labeledImages').textContent = data.stats.labeled_images;
+                document.getElementById('unlabeledImages').textContent = data.stats.unlabeled_images;
+                document.getElementById('modelsCount').textContent = data.stats.models_count;
+
+                // 갤러리 업데이트
+                const gallery = document.getElementById('imageGallery');
+                gallery.innerHTML = data.images.map(img => `
+                    <div class="gallery-item ${img.labeled ? 'labeled' : ''} ${img.image_id === currentImageId ? 'selected' : ''}"
+                         onclick="selectImage('${img.image_id}')">
+                        <img src="/api/training/image/${img.image_id}" alt="${img.image_id}">
+                    </div>
+                `).join('');
+            } catch (e) {
+                console.error('이미지 로드 실패:', e);
+            }
+        }
+
+        // 이미지 선택
+        async function selectImage(imageId) {
+            currentImageId = imageId;
+            currentLabels = [];
+
+            // 이미지 정보 로드
+            try {
+                const res = await fetch(`/api/training/image/${imageId}/info`);
+                const info = await res.json();
+
+                // 기존 라벨 복원
+                if (info.labels && info.labels.length > 0) {
+                    currentLabels = info.labels.map(label => {
+                        const [xc, yc, w, h] = label.bbox;
+                        const x1 = (xc - w/2) * canvas.width;
+                        const y1 = (yc - h/2) * canvas.height;
+                        const x2 = (xc + w/2) * canvas.width;
+                        const y2 = (yc + h/2) * canvas.height;
+                        return {
+                            class_id: label.class_id,
+                            bbox: label.bbox,
+                            pixel_bbox: [x1, y1, x2, y2]
+                        };
+                    });
+                }
+            } catch (e) {}
+
+            // 이미지 로드
+            currentImage = new Image();
+            currentImage.onload = () => {
+                redrawCanvas();
+                updateLabelsUI();
+            };
+            currentImage.src = `/api/training/image/${imageId}`;
+
+            // 갤러리 선택 표시
+            document.querySelectorAll('.gallery-item').forEach(item => {
+                item.classList.toggle('selected', item.querySelector('img').src.includes(imageId));
+            });
+        }
+
+        // 라벨 저장
+        async function saveLabels() {
+            if (!currentImageId) return alert('이미지를 선택하세요');
+
+            const labelsToSave = currentLabels.map(l => ({
+                class_id: l.class_id,
+                bbox: l.bbox
+            }));
+
+            try {
+                const res = await fetch(`/api/training/label/${currentImageId}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(labelsToSave)
+                });
+                if (res.ok) {
+                    alert('저장 완료!');
+                    loadImages();
+                }
+            } catch (e) {
+                console.error('저장 실패:', e);
+            }
+        }
+
+        // 이미지 삭제
+        async function deleteImage() {
+            if (!currentImageId) return;
+            if (!confirm('이미지를 삭제하시겠습니까?')) return;
+
+            try {
+                await fetch(`/api/training/image/${currentImageId}`, { method: 'DELETE' });
+                currentImageId = null;
+                currentLabels = [];
+                currentImage = null;
+                redrawCanvas();
+                loadImages();
+            } catch (e) {
+                console.error('삭제 실패:', e);
+            }
+        }
+
+        // 학습 시작
+        async function startTraining() {
+            const epochs = parseInt(document.getElementById('epochsInput').value);
+            if (epochs < 10) return alert('최소 10 에포크 필요');
+
+            try {
+                const res = await fetch(`/api/training/start?epochs=${epochs}`, { method: 'POST' });
+                const data = await res.json();
+                if (data.success) {
+                    document.getElementById('trainBtn').disabled = true;
+                    pollTrainingStatus();
+                } else {
+                    alert(data.error || '학습 시작 실패');
+                }
+            } catch (e) {
+                console.error('학습 시작 실패:', e);
+            }
+        }
+
+        // 학습 상태 확인
+        async function checkTrainingStatus() {
+            try {
+                const res = await fetch('/api/training/status');
+                const data = await res.json();
+                updateTrainingUI(data);
+                if (data.is_training) {
+                    pollTrainingStatus();
+                }
+            } catch (e) {}
+        }
+
+        function pollTrainingStatus() {
+            const interval = setInterval(async () => {
+                try {
+                    const res = await fetch('/api/training/status');
+                    const data = await res.json();
+                    updateTrainingUI(data);
+
+                    if (!data.is_training) {
+                        clearInterval(interval);
+                        document.getElementById('trainBtn').disabled = false;
+                        loadModels();
+                    }
+                } catch (e) {}
+            }, 2000);
+        }
+
+        function updateTrainingUI(data) {
+            document.getElementById('trainingStatus').textContent = data.status;
+            document.getElementById('trainingProgress').style.width = `${data.progress}%`;
+        }
+
+        // 모델 목록 로드
+        async function loadModels() {
+            try {
+                const res = await fetch('/api/training/models');
+                const data = await res.json();
+
+                const list = document.getElementById('modelsList');
+                list.innerHTML = data.models.map(model => `
+                    <div class="model-item ${model.is_active ? 'active' : ''}">
+                        <div class="model-info">
+                            <div class="model-name">${model.name}</div>
+                            <div class="model-meta">${model.size_mb} MB | ${new Date(model.modified).toLocaleString()}</div>
+                        </div>
+                        ${!model.is_active ? `<button class="btn btn-secondary" onclick="switchModel('${model.name}')">적용</button>` : '<span style="color:var(--primary)">현재 사용중</span>'}
+                    </div>
+                `).join('');
+            } catch (e) {
+                console.error('모델 로드 실패:', e);
+            }
+        }
+
+        // 모델 교체
+        async function switchModel(modelName) {
+            if (!confirm(`${modelName} 모델로 교체하시겠습니까?`)) return;
+
+            try {
+                const res = await fetch(`/api/training/switch/${modelName}`, { method: 'POST' });
+                if (res.ok) {
+                    alert('모델 교체 완료! 서버 재시작이 필요할 수 있습니다.');
+                    loadModels();
+                }
+            } catch (e) {
+                console.error('모델 교체 실패:', e);
+            }
+        }
+
+        // 모델 리로드
+        async function reloadModel() {
+            try {
+                const res = await fetch('/api/training/reload', { method: 'POST' });
+                if (res.ok) alert('모델 리로드 완료!');
+            } catch (e) {
+                console.error('리로드 실패:', e);
+            }
+        }
+
+        // 클래스 선택 초기화
+        selectClass(0);
+    </script>
+</body>
+</html>

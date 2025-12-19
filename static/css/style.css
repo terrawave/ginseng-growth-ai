@@ -1,0 +1,473 @@
+/* 새싹인삼 생육 AI - 한 화면 대시보드 */
+
+:root {
+    --primary: #2e7d32;
+    --primary-light: #60ad5e;
+    --secondary: #1565c0;
+    --warning: #ff9800;
+    --danger: #d32f2f;
+    --success: #4caf50;
+    --bg: #1a1a2e;
+    --panel: #16213e;
+    --card: #0f3460;
+    --text: #eaeaea;
+    --text-dim: #a0a0a0;
+    --border: #2a2a4a;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+html, body {
+    height: 100vh;
+    overflow: hidden;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+}
+
+/* 대시보드 컨테이너 */
+.dashboard {
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    padding: 10px;
+    gap: 10px;
+}
+
+/* 헤더 */
+.header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 15px;
+    background: var(--panel);
+    border-radius: 8px;
+    flex-shrink: 0;
+}
+
+.header h1 {
+    font-size: 1.2rem;
+    color: var(--primary-light);
+}
+
+.status-indicators {
+    display: flex;
+    gap: 10px;
+}
+
+.indicator {
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    background: var(--card);
+}
+
+.indicator.connected { background: var(--success); color: white; }
+.indicator.disconnected { background: var(--danger); color: white; }
+
+/* 메인 그리드 - 3컬럼 */
+.main-grid {
+    flex: 1;
+    display: grid;
+    grid-template-columns: 1.2fr 1fr 0.8fr;
+    gap: 10px;
+    min-height: 0;
+}
+
+/* 패널 공통 스타일 */
+.camera-panel, .sensor-panel, .control-panel {
+    background: var(--panel);
+    border-radius: 8px;
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.sensor-panel h2, .control-panel h2 {
+    font-size: 1.1rem;
+    color: var(--primary-light);
+    margin-bottom: 15px;
+    padding-bottom: 8px;
+    border-bottom: 2px solid var(--primary-light);
+}
+
+.sensor-panel {
+    display: flex;
+    flex-direction: column;
+}
+
+/* 카메라 패널 */
+.camera-wrapper {
+    position: relative;
+    flex: 1;
+    min-height: 0;
+    background: #000;
+    border-radius: 6px;
+    overflow: hidden;
+}
+
+.camera-wrapper img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+
+.detection-overlay {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+}
+
+.badge {
+    padding: 6px 12px;
+    border-radius: 6px;
+    text-align: center;
+    font-weight: bold;
+    font-size: 0.85rem;
+}
+
+.badge.unknown { background: rgba(100,100,100,0.8); }
+.badge.germination { background: rgba(129,199,132,0.9); color: #1b5e20; }
+.badge.growth { background: rgba(79,195,247,0.9); color: #01579b; }
+.badge.harvest { background: rgba(255,183,77,0.9); color: #e65100; }
+
+.badge .stage { display: block; }
+.badge .conf { font-size: 0.7rem; opacity: 0.9; }
+
+/* 인식 상세 정보 */
+.detection-details {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+    margin-top: 10px;
+    flex-shrink: 0;
+}
+
+.detail-item {
+    background: var(--card);
+    padding: 8px;
+    border-radius: 6px;
+    text-align: center;
+}
+
+.detail-item .label {
+    display: block;
+    font-size: 0.65rem;
+    color: var(--text-dim);
+    margin-bottom: 2px;
+}
+
+.detail-item .value {
+    font-size: 1rem;
+    font-weight: bold;
+}
+
+.detail-item .value.small {
+    font-size: 0.75rem;
+}
+
+/* 센서 패널 - 강조 스타일 */
+.sensor-rows {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    flex: 1;
+}
+
+.sensor-row {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 12px;
+    padding: 20px;
+    background: linear-gradient(135deg, #1a1a2e 0%, #0d0d1a 100%);
+    border-radius: 16px;
+    border-left: 5px solid var(--primary-light);
+    box-shadow: 0 6px 20px rgba(0,0,0,0.4);
+}
+
+.sensor-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.sensor-info {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+}
+
+.sensor-name {
+    font-size: 1.3rem;
+    color: #fff;
+    font-weight: 700;
+    min-width: 50px;
+}
+
+.sensor-value {
+    font-size: 3rem;
+    font-weight: bold;
+    color: #00ff88;
+    text-shadow: 0 0 30px rgba(0,255,136,0.6);
+}
+
+.sensor-unit {
+    font-size: 1.1rem;
+    color: #aaa;
+    margin-left: 4px;
+}
+
+.sensor-status {
+    font-size: 1rem;
+    font-weight: bold;
+    text-align: center;
+    padding: 8px 18px;
+    border-radius: 25px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.sensor-status.low {
+    background: linear-gradient(135deg, #1565c0, #1976d2);
+    color: white;
+    box-shadow: 0 0 20px rgba(21,101,192,0.6);
+}
+.sensor-status.ok {
+    background: linear-gradient(135deg, #00c853, #69f0ae);
+    color: #000;
+    box-shadow: 0 0 20px rgba(0,200,83,0.6);
+}
+.sensor-status.high {
+    background: linear-gradient(135deg, #ff5722, #ff9800);
+    color: white;
+    box-shadow: 0 0 20px rgba(255,87,34,0.6);
+}
+
+.target-bar {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.bar-track {
+    height: 20px;
+    background: #000;
+    border-radius: 10px;
+    position: relative;
+    overflow: hidden;
+    box-shadow: inset 0 3px 6px rgba(0,0,0,0.5);
+    border: 1px solid #333;
+}
+
+.bar-target {
+    position: absolute;
+    height: 100%;
+    background: linear-gradient(90deg, #00c853, #69f0ae);
+    border-radius: 10px;
+    opacity: 0.8;
+}
+
+.bar-current {
+    position: absolute;
+    height: 100%;
+    width: 6px;
+    background: #fff;
+    border-radius: 3px;
+    transition: left 0.3s;
+    box-shadow: 0 0 15px #fff, 0 0 30px #fff;
+}
+
+.target-text {
+    font-size: 1rem;
+    color: #69f0ae;
+    font-weight: 600;
+}
+
+/* 생장단계 카드 */
+.stage-cards {
+    display: flex;
+    gap: 12px;
+    margin-top: auto;
+    padding-top: 15px;
+}
+
+.stage-card {
+    flex: 1;
+    padding: 15px 10px;
+    background: linear-gradient(135deg, #1a1a2e 0%, #0d0d1a 100%);
+    border-radius: 12px;
+    text-align: center;
+    border: 2px solid #333;
+    transition: all 0.3s;
+    cursor: pointer;
+}
+
+.stage-card:hover {
+    border-color: #555;
+    transform: translateY(-2px);
+}
+
+.stage-card.active {
+    border-color: #00ff88;
+    background: linear-gradient(135deg, rgba(0,255,136,0.2) 0%, rgba(0,200,83,0.1) 100%);
+    box-shadow: 0 0 20px rgba(0,255,136,0.3);
+}
+
+.stage-card .stage-name {
+    font-size: 1.1rem;
+    font-weight: bold;
+    margin-bottom: 6px;
+    color: #fff;
+}
+
+.stage-card.active .stage-name {
+    color: #00ff88;
+}
+
+.stage-card .stage-range {
+    font-size: 0.75rem;
+    color: #888;
+    line-height: 1.4;
+}
+
+/* 제어 패널 */
+.auto-toggle {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px;
+    background: var(--card);
+    border-radius: 6px;
+    margin-bottom: 10px;
+}
+
+.switch {
+    position: relative;
+    width: 50px;
+    height: 26px;
+}
+
+.switch input { opacity: 0; width: 0; height: 0; }
+
+.slider {
+    position: absolute;
+    cursor: pointer;
+    inset: 0;
+    background: var(--border);
+    border-radius: 26px;
+    transition: 0.3s;
+}
+
+.slider::before {
+    content: "";
+    position: absolute;
+    height: 20px;
+    width: 20px;
+    left: 3px;
+    bottom: 3px;
+    background: white;
+    border-radius: 50%;
+    transition: 0.3s;
+}
+
+.switch input:checked + .slider { background: var(--success); }
+.switch input:checked + .slider::before { transform: translateX(24px); }
+
+.toggle-label {
+    font-size: 0.85rem;
+    font-weight: 600;
+}
+
+/* 펌프 버튼 */
+.pump-buttons {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 10px;
+}
+
+.pump-group {
+    flex: 1;
+    text-align: center;
+}
+
+.pump-btn {
+    width: 100%;
+    padding: 12px 8px;
+    border: none;
+    border-radius: 8px;
+    background: var(--card);
+    color: var(--text);
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+}
+
+.pump-btn:hover { background: var(--border); }
+
+.pump-btn.active {
+    background: var(--success);
+    box-shadow: 0 0 15px rgba(76,175,80,0.5);
+}
+
+.pump-name { font-size: 0.8rem; font-weight: bold; }
+.pump-action { font-size: 0.65rem; color: var(--text-dim); }
+.pump-status { font-size: 0.75rem; margin-top: 3px; }
+
+.pump-btn.active .pump-action { color: rgba(255,255,255,0.8); }
+
+.cooldown {
+    font-size: 0.65rem;
+    color: var(--warning);
+    margin-top: 3px;
+    height: 14px;
+}
+
+/* 로그 섹션 */
+.log-section {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+}
+
+.log-section h3 {
+    font-size: 0.8rem;
+    color: var(--text-dim);
+    margin-bottom: 5px;
+}
+
+.log-container {
+    flex: 1;
+    background: var(--card);
+    border-radius: 6px;
+    padding: 8px;
+    overflow-y: auto;
+    font-family: 'Consolas', monospace;
+    font-size: 0.7rem;
+}
+
+.log-entry {
+    padding: 3px 0;
+    border-bottom: 1px solid var(--border);
+    color: var(--text-dim);
+}
+
+.log-entry:last-child { border-bottom: none; }
+.log-entry.action { color: #4fc3f7; }
+.log-entry.warning { color: #ffb74d; }
+.log-entry.error { color: #ef5350; }
+
+/* 스크롤바 스타일 */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: var(--card); }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--text-dim); }
