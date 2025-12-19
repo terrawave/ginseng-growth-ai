@@ -103,10 +103,24 @@ class NutrientController:
         self.is_enabled = True
         print("[Controller] 자동 제어 활성화")
 
-    def disable(self):
-        """자동 제어 비활성화"""
+    async def disable(self):
+        """자동 제어 비활성화 + 모든 펌프 정지"""
         self.is_enabled = False
         print("[Controller] 자동 제어 비활성화")
+
+        # 모든 펌프 상태 초기화
+        for pump in PumpType:
+            self.pump_states[pump] = False
+
+        # 실제 펌프 끄기 (양액AB, 양액C, 교반기)
+        if self.pump_callback:
+            try:
+                await self.pump_callback("slave1", 1, False)  # 양액 A,B
+                await self.pump_callback("slave1", 2, False)  # 양액 C
+                await self.pump_callback("slave1", 3, False)  # 교반기
+                print("[Controller] 모든 펌프 정지 완료")
+            except Exception as e:
+                print(f"[Controller] 펌프 정지 오류: {e}")
 
     def can_activate_pump(self, pump: PumpType) -> bool:
         """펌프 활성화 가능 여부 (쿨다운 체크)"""
@@ -114,7 +128,7 @@ class NutrientController:
         return time.time() - last_time >= self.pump_cooldown
 
     async def activate_pump(self, pump: PumpType, reason: str):
-        """펌프 작동 (양액펌프는 교반기도 함께 작동)"""
+        """펌프 작동 (교반기는 별도 제어)"""
         if self.pump_states[pump]:
             return  # 이미 작동 중
 
@@ -123,16 +137,9 @@ class NutrientController:
             print(f"[Controller] {pump.value} 쿨다운 중 ({remaining:.0f}초 남음)")
             return
 
-        # 양액 펌프인 경우 교반기도 함께 작동
-        with_mixer = pump in [PumpType.NUTRIENT_AB, PumpType.NUTRIENT_C]
-
         print(f"[Controller] {pump.value} 작동 시작 - {reason}")
         self.pump_states[pump] = True
         self.last_pump_times[pump] = time.time()
-
-        if with_mixer:
-            self.pump_states[PumpType.MIXER] = True
-            print(f"[Controller] 교반기 함께 작동")
 
         # 실제 펌프 제어
         if self.pump_callback:
@@ -141,10 +148,6 @@ class NutrientController:
                     await self.pump_callback("slave1", 1, True)  # slave1 릴레이1
                 elif pump == PumpType.NUTRIENT_C:
                     await self.pump_callback("slave1", 2, True)  # slave1 릴레이2
-
-                # 양액 펌프와 함께 교반기 켜기
-                if with_mixer:
-                    await self.pump_callback("slave1", 3, True)  # slave1 릴레이3 = 교반기
             except Exception as e:
                 print(f"[Controller] 펌프 제어 오류: {e}")
 
@@ -154,45 +157,30 @@ class NutrientController:
         self.pump_states[pump] = False
         print(f"[Controller] {pump.value} 작동 정지")
 
-        if with_mixer:
-            self.pump_states[PumpType.MIXER] = False
-            print(f"[Controller] 교반기 정지")
-
         if self.pump_callback:
             try:
                 if pump == PumpType.NUTRIENT_AB:
                     await self.pump_callback("slave1", 1, False)
                 elif pump == PumpType.NUTRIENT_C:
                     await self.pump_callback("slave1", 2, False)
-
-                # 양액 펌프와 함께 교반기 끄기
-                if with_mixer:
-                    await self.pump_callback("slave1", 3, False)
             except Exception as e:
                 print(f"[Controller] 펌프 정지 오류: {e}")
 
-    def check_and_control(self, ec: float, ph: float) -> Optional[ControlAction]:
+    def check_and_control(self, ec: float, ph: float) -> list:
         """
-        EC/pH 값 확인 및 제어 필요 여부 판단
-
-        순서: EC 먼저 맞추고 → pH 조절
-        - EC가 목표 범위 밖이면 EC만 제어 (pH 무시)
-        - EC가 목표 범위 안이면 pH 제어
+        EC/pH 값 확인 및 제어 필요 여부 판단 (동시 제어)
 
         Returns:
-            ControlAction if action needed, None otherwise
+            List of ControlAction (EC, pH 동시 제어 가능)
         """
         if not self.is_enabled:
-            return None
+            return []
 
         targets = self.get_targets()
-        action = None
+        actions = []
 
-        # EC가 목표 범위 안인지 확인
-        ec_in_range = targets["ec_min"] <= ec <= targets["ec_max"]
-
-        # 1단계: EC 체크 - EC가 낮으면 먼저 EC부터 맞춤
-        if ec < targets["ec_min"] - self.ec_tolerance:
+        # EC 체크 - EC가 목표 최소값보다 낮으면 EC 조절
+        if ec < targets["ec_min"]:
             if self.can_activate_pump(PumpType.NUTRIENT_AB):
                 action = ControlAction(
                     pump=PumpType.NUTRIENT_AB,
@@ -202,54 +190,73 @@ class NutrientController:
                     target_max=targets["ec_max"],
                     timestamp=time.time()
                 )
+                actions.append(action)
                 self.action_history.append(action)
-                print(f"[Controller] EC 조절 중 - pH 조절 대기")
-            return action  # EC 조절 중에는 pH 건드리지 않음
 
-        # 2단계: EC가 범위 내일 때만 pH 체크
-        if ec_in_range:
-            if ph > targets["ph_max"] + self.ph_tolerance:
-                if self.can_activate_pump(PumpType.NUTRIENT_C):
-                    action = ControlAction(
-                        pump=PumpType.NUTRIENT_C,
-                        reason=f"pH 높음 ({ph:.2f} > {targets['ph_max']:.2f})",
-                        current_value=ph,
-                        target_min=targets["ph_min"],
-                        target_max=targets["ph_max"],
-                        timestamp=time.time()
-                    )
-                    self.action_history.append(action)
-                    print(f"[Controller] EC 정상 → pH 조절 시작")
-        else:
-            if ph > targets["ph_max"] + self.ph_tolerance:
-                print(f"[Controller] pH 높음 대기 중 (EC 먼저 조절 필요: {ec:.2f})")
+        # pH 체크 - pH가 목표 최대값보다 높으면 pH 조절
+        if ph > targets["ph_max"]:
+            if self.can_activate_pump(PumpType.NUTRIENT_C):
+                action = ControlAction(
+                    pump=PumpType.NUTRIENT_C,
+                    reason=f"pH 높음 ({ph:.2f} > {targets['ph_max']:.2f})",
+                    current_value=ph,
+                    target_min=targets["ph_min"],
+                    target_max=targets["ph_max"],
+                    timestamp=time.time()
+                )
+                actions.append(action)
+                self.action_history.append(action)
 
-        return action
+        return actions
 
     async def control_loop(self, get_sensor_data: Callable):
         """자동 제어 루프"""
         self.is_running = True
+        mixer_was_on = False
         print("[Controller] 자동 제어 루프 시작")
 
         while self.is_running:
             try:
                 if self.is_enabled:
+                    # 교반기 상시 작동 (자동제어 활성화 시)
+                    if not mixer_was_on:
+                        if self.pump_callback:
+                            await self.pump_callback("slave1", 3, True)
+                            self.pump_states[PumpType.MIXER] = True
+                            print("[Controller] 교반기 상시 작동 시작")
+                        mixer_was_on = True
+
                     # 센서 데이터 가져오기
                     data = await get_sensor_data()
                     if data:
                         ec = data.get("ec", 0)
                         ph = data.get("ph", 7)
 
-                        # 제어 필요 여부 확인
-                        action = self.check_and_control(ec, ph)
-                        if action:
-                            await self.activate_pump(action.pump, action.reason)
+                        # 제어 필요 여부 확인 (동시 제어)
+                        actions = self.check_and_control(ec, ph)
+                        if actions:
+                            # EC, pH 펌프 동시 작동
+                            tasks = [self.activate_pump(a.pump, a.reason) for a in actions]
+                            await asyncio.gather(*tasks)
+                else:
+                    # 자동제어 비활성화 시 교반기 정지
+                    if mixer_was_on:
+                        if self.pump_callback:
+                            await self.pump_callback("slave1", 3, False)
+                            self.pump_states[PumpType.MIXER] = False
+                            print("[Controller] 교반기 정지")
+                        mixer_was_on = False
 
                 await asyncio.sleep(10)  # 10초마다 체크
 
             except Exception as e:
                 print(f"[Controller] 루프 오류: {e}")
                 await asyncio.sleep(5)
+
+        # 종료 시 교반기 정지
+        if mixer_was_on and self.pump_callback:
+            await self.pump_callback("slave1", 3, False)
+            self.pump_states[PumpType.MIXER] = False
 
         print("[Controller] 자동 제어 루프 종료")
 

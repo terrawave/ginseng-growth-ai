@@ -68,14 +68,20 @@ async def detection_loop():
     """카메라 인식 루프 (비동기 최적화)"""
     print("[Main] 인식 루프 시작 (비동기)")
     loop = asyncio.get_event_loop()
+    loop_count = 0
 
     while True:
         try:
+            loop_count += 1
             if camera.is_running and detector.is_loaded:
                 frame = camera.get_frame()
                 if frame is not None:
                     # 블로킹 방지: 별도 스레드에서 YOLO 추론 실행
                     detection = await loop.run_in_executor(None, detector.detect, frame)
+
+                    # 10회마다 상태 출력 (디버그)
+                    if loop_count % 10 == 0:
+                        print(f"[Debug] 추론 #{loop_count}: detection={detection is not None}")
 
                     if detection:
                         # 생장단계 업데이트
@@ -228,7 +234,7 @@ async def toggle_auto_control(enabled: bool = True):
     if enabled:
         controller.enable()
     else:
-        controller.disable()
+        await controller.disable()
     return {"auto_control": controller.is_enabled}
 
 
@@ -373,6 +379,78 @@ async def reload_model():
     return JSONResponse({"error": "리로드 실패"}, status_code=500)
 
 
+@app.get("/api/system/info")
+async def get_system_info():
+    """시스템 정보 조회"""
+    import platform
+    import sys
+    import os
+    import psutil
+    from datetime import datetime
+
+    # CPU 정보
+    cpu_percent = psutil.cpu_percent(interval=0.1)
+    cpu_count = psutil.cpu_count()
+
+    # 메모리 정보
+    memory = psutil.virtual_memory()
+
+    # 디스크 정보
+    disk = psutil.disk_usage('/')
+
+    # 프로세스 정보
+    process = psutil.Process(os.getpid())
+    process_memory = process.memory_info()
+
+    # GPU 정보 (YOLO용)
+    try:
+        import torch
+        gpu_available = torch.cuda.is_available()
+        gpu_name = torch.cuda.get_device_name(0) if gpu_available else "N/A"
+    except:
+        gpu_available = False
+        gpu_name = "N/A"
+
+    return {
+        "system": {
+            "os": platform.system(),
+            "os_version": platform.version(),
+            "os_release": platform.release(),
+            "machine": platform.machine(),
+            "processor": platform.processor(),
+            "hostname": platform.node(),
+            "python_version": sys.version.split()[0],
+        },
+        "hardware": {
+            "cpu_count": cpu_count,
+            "cpu_percent": cpu_percent,
+            "memory_total_gb": round(memory.total / (1024**3), 2),
+            "memory_used_gb": round(memory.used / (1024**3), 2),
+            "memory_percent": memory.percent,
+            "disk_total_gb": round(disk.total / (1024**3), 2),
+            "disk_used_gb": round(disk.used / (1024**3), 2),
+            "disk_percent": disk.percent,
+            "process_memory_mb": round(process_memory.rss / (1024**2), 2),
+            "gpu_available": gpu_available,
+            "gpu_name": gpu_name,
+        },
+        "ai": {
+            "model_loaded": detector.is_loaded,
+            "model_path": detector.model_path,
+            "confidence_threshold": detector.confidence_threshold,
+            "detection_count": len(detector.detection_history),
+        },
+        "frameworks": {
+            "FastAPI": {"version": "0.100+", "description": "비동기 웹 프레임워크"},
+            "YOLOv8": {"version": "Ultralytics", "description": "객체 인식 AI 모델"},
+            "OpenCV": {"version": "4.x", "description": "컴퓨터 비전 라이브러리"},
+            "PyTorch": {"version": "2.x", "description": "딥러닝 프레임워크"},
+            "NumPy": {"version": "1.x", "description": "수치 연산 라이브러리"},
+            "WebSocket": {"version": "실시간", "description": "양방향 실시간 통신"},
+        }
+    }
+
+
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     """WebSocket 연결"""
@@ -398,7 +476,7 @@ async def websocket_endpoint(websocket: WebSocket):
                 if msg.get("enabled"):
                     controller.enable()
                 else:
-                    controller.disable()
+                    await controller.disable()
 
             elif msg.get("type") == "manual_pump":
                 pump = msg.get("pump")

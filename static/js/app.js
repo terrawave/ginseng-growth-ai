@@ -397,6 +397,94 @@ class GinsengApp {
             container.removeChild(container.lastChild);
         }
     }
+
+    // ===== 시스템 정보 =====
+    async showSystemInfo() {
+        document.getElementById('system-modal').classList.remove('hidden');
+        await this.loadSystemInfo();
+    }
+
+    closeSystemInfo() {
+        document.getElementById('system-modal').classList.add('hidden');
+    }
+
+    async loadSystemInfo() {
+        try {
+            const response = await fetch('/api/system/info');
+            const data = await response.json();
+            this.renderSystemInfo(data);
+        } catch (error) {
+            console.error('Failed to load system info:', error);
+        }
+    }
+
+    renderSystemInfo(data) {
+        // 시스템 정보
+        const systemList = document.getElementById('system-info-list');
+        if (systemList && data.system) {
+            systemList.innerHTML = `
+                <div class="info-item"><span class="label">운영체제</span><span class="value">${data.system.os} ${data.system.os_release}</span></div>
+                <div class="info-item"><span class="label">호스트명</span><span class="value">${data.system.hostname}</span></div>
+                <div class="info-item"><span class="label">프로세서</span><span class="value">${data.system.machine}</span></div>
+                <div class="info-item"><span class="label">Python</span><span class="value">${data.system.python_version}</span></div>
+            `;
+        }
+
+        // 하드웨어 정보
+        const hardwareList = document.getElementById('hardware-info-list');
+        if (hardwareList && data.hardware) {
+            const hw = data.hardware;
+            const cpuClass = hw.cpu_percent > 80 ? 'danger' : hw.cpu_percent > 50 ? 'warning' : '';
+            const memPercent = hw.memory_percent;
+            const memClass = memPercent > 80 ? 'danger' : memPercent > 50 ? 'warning' : '';
+            const diskClass = hw.disk_percent > 80 ? 'danger' : hw.disk_percent > 50 ? 'warning' : '';
+
+            hardwareList.innerHTML = `
+                <div class="progress-item">
+                    <div class="progress-header"><span>CPU</span><span>${hw.cpu_percent}% (${hw.cpu_count}코어)</span></div>
+                    <div class="progress-bar"><div class="progress-fill ${cpuClass}" style="width:${hw.cpu_percent}%"></div></div>
+                </div>
+                <div class="progress-item">
+                    <div class="progress-header"><span>메모리</span><span>${hw.memory_used_gb}/${hw.memory_total_gb} GB</span></div>
+                    <div class="progress-bar"><div class="progress-fill ${memClass}" style="width:${memPercent}%"></div></div>
+                </div>
+                <div class="progress-item">
+                    <div class="progress-header"><span>디스크</span><span>${hw.disk_used_gb}/${hw.disk_total_gb} GB</span></div>
+                    <div class="progress-bar"><div class="progress-fill ${diskClass}" style="width:${hw.disk_percent}%"></div></div>
+                </div>
+                <div class="info-item"><span class="label">프로세스 메모리</span><span class="value">${hw.process_memory_mb} MB</span></div>
+                <div class="info-item"><span class="label">GPU</span><span class="value">${hw.gpu_available ? hw.gpu_name : '없음'}</span></div>
+            `;
+        }
+
+        // AI 모델 정보
+        const aiList = document.getElementById('ai-info-list');
+        if (aiList && data.ai) {
+            aiList.innerHTML = `
+                <div class="info-item"><span class="label">모델 상태</span><span class="value">${data.ai.model_loaded ? '✅ 로드됨' : '❌ 미로드'}</span></div>
+                <div class="info-item"><span class="label">모델 경로</span><span class="value">${data.ai.model_path}</span></div>
+                <div class="info-item"><span class="label">신뢰도 임계값</span><span class="value">${(data.ai.confidence_threshold * 100).toFixed(0)}%</span></div>
+                <div class="info-item"><span class="label">누적 인식 수</span><span class="value">${data.ai.detection_count}회</span></div>
+            `;
+        }
+
+        // 프레임워크 정보
+        const frameworkList = document.getElementById('framework-list');
+        if (frameworkList && data.frameworks) {
+            const icons = {
+                'FastAPI': '⚡', 'YOLOv8': '🎯', 'OpenCV': '👁️',
+                'PyTorch': '🔥', 'NumPy': '🔢', 'WebSocket': '🔌'
+            };
+            frameworkList.innerHTML = Object.entries(data.frameworks).map(([name, info]) => `
+                <div class="framework-item">
+                    <div class="icon">${icons[name] || '📦'}</div>
+                    <div class="name">${name}</div>
+                    <div class="version">${info.version}</div>
+                    <div class="desc">${info.description}</div>
+                </div>
+            `).join('');
+        }
+    }
 }
 
 // 앱 시작

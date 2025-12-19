@@ -31,7 +31,7 @@ GROWTH_STAGES = {
 # YOLO 모델 설정
 YOLO_CONFIG = {
     "model_path": "models/ginseng_growth.pt",
-    "confidence_threshold": 0.5,  # 50% 이상만 인식
+    "confidence_threshold": 0.3,  # 30% 이상만 인식 (테스트용)
     "class_names": ["germination", "growth", "harvest"],
 }
 

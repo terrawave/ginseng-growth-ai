@@ -471,3 +471,233 @@ html, body {
 ::-webkit-scrollbar-track { background: var(--card); }
 ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--text-dim); }
+
+/* 헤더 버튼 */
+.header-buttons {
+    display: flex;
+    gap: 8px;
+}
+
+.header-btn {
+    padding: 6px 12px;
+    border-radius: 6px;
+    text-decoration: none;
+    font-size: 0.8rem;
+    border: none;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.header-btn.training {
+    background: #1565c0;
+    color: white;
+}
+
+.header-btn.system {
+    background: #2e7d32;
+    color: white;
+}
+
+.header-btn:hover {
+    opacity: 0.9;
+    transform: translateY(-1px);
+}
+
+/* 모달 오버레이 */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.8);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+.modal-overlay.hidden {
+    display: none;
+}
+
+.modal.system-modal {
+    background: var(--bg);
+    border-radius: 12px;
+    width: 90%;
+    max-width: 800px;
+    max-height: 85vh;
+    overflow: hidden;
+    border: 1px solid var(--border);
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 20px;
+    background: var(--card);
+    border-bottom: 1px solid var(--border);
+}
+
+.modal-header h2 {
+    font-size: 1.1rem;
+    color: var(--text);
+}
+
+.close-btn {
+    background: none;
+    border: none;
+    color: var(--text-dim);
+    font-size: 1.2rem;
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: 4px;
+}
+
+.close-btn:hover {
+    background: var(--border);
+    color: var(--text);
+}
+
+.modal-body {
+    padding: 20px;
+    overflow-y: auto;
+    max-height: calc(85vh - 60px);
+}
+
+/* 시스템 정보 그리드 */
+.system-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 16px;
+}
+
+.info-card {
+    background: var(--card);
+    border-radius: 10px;
+    padding: 16px;
+    border: 1px solid var(--border);
+}
+
+.info-card.full-width {
+    grid-column: 1 / -1;
+}
+
+.info-card h3 {
+    font-size: 0.9rem;
+    margin-bottom: 12px;
+    color: var(--text);
+}
+
+.info-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.info-item {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.8rem;
+    padding: 6px 0;
+    border-bottom: 1px solid var(--border);
+}
+
+.info-item:last-child {
+    border-bottom: none;
+}
+
+.info-item .label {
+    color: var(--text-dim);
+}
+
+.info-item .value {
+    color: var(--text);
+    font-weight: 500;
+}
+
+/* 프로그레스 바 */
+.progress-item {
+    margin-bottom: 12px;
+}
+
+.progress-header {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.8rem;
+    margin-bottom: 4px;
+}
+
+.progress-bar {
+    height: 8px;
+    background: var(--border);
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--primary), #4fc3f7);
+    border-radius: 4px;
+    transition: width 0.3s;
+}
+
+.progress-fill.warning {
+    background: linear-gradient(90deg, #ff9800, #ffb74d);
+}
+
+.progress-fill.danger {
+    background: linear-gradient(90deg, #f44336, #ef5350);
+}
+
+/* 프레임워크 그리드 */
+.framework-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+}
+
+.framework-item {
+    background: var(--bg);
+    border-radius: 8px;
+    padding: 12px;
+    border: 1px solid var(--border);
+    text-align: center;
+}
+
+.framework-item .icon {
+    font-size: 1.5rem;
+    margin-bottom: 6px;
+}
+
+.framework-item .name {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--text);
+}
+
+.framework-item .version {
+    font-size: 0.7rem;
+    color: var(--primary);
+    background: rgba(76, 175, 80, 0.2);
+    padding: 2px 6px;
+    border-radius: 4px;
+    display: inline-block;
+    margin-top: 4px;
+}
+
+.framework-item .desc {
+    font-size: 0.7rem;
+    color: var(--text-dim);
+    margin-top: 6px;
+}
+
+@media (max-width: 600px) {
+    .system-grid {
+        grid-template-columns: 1fr;
+    }
+    .framework-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}

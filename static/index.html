@@ -11,7 +11,10 @@
         <!-- 헤더 -->
         <header class="header">
             <h1>새싹인삼 생육 AI</h1>
-            <a href="/training" style="background:#1565c0; color:white; padding:6px 12px; border-radius:6px; text-decoration:none; font-size:0.8rem;">모델 학습</a>
+            <div class="header-buttons">
+                <a href="/training" class="header-btn training">모델 학습</a>
+                <button id="system-info-btn" class="header-btn system" onclick="app.showSystemInfo()">시스템 정보</button>
+            </div>
             <div class="status-indicators">
                 <span id="connection-status" class="indicator disconnected">연결중...</span>
                 <span id="auto-status" class="indicator">자동: OFF</span>
@@ -169,6 +172,40 @@
         </main>
     </div>
 
-    <script src="/static/js/app.js?v=2"></script>
+    <!-- 시스템 정보 모달 -->
+    <div id="system-modal" class="modal-overlay hidden">
+        <div class="modal system-modal">
+            <div class="modal-header">
+                <h2>시스템 정보</h2>
+                <button class="close-btn" onclick="app.closeSystemInfo()">✕</button>
+            </div>
+            <div class="modal-body">
+                <div class="system-grid">
+                    <!-- 시스템 정보 -->
+                    <div class="info-card">
+                        <h3>💻 시스템</h3>
+                        <div id="system-info-list" class="info-list">로딩중...</div>
+                    </div>
+                    <!-- 하드웨어 -->
+                    <div class="info-card">
+                        <h3>📊 하드웨어</h3>
+                        <div id="hardware-info-list" class="info-list">로딩중...</div>
+                    </div>
+                    <!-- AI 모델 -->
+                    <div class="info-card">
+                        <h3>🤖 AI 모델</h3>
+                        <div id="ai-info-list" class="info-list">로딩중...</div>
+                    </div>
+                    <!-- 프레임워크 -->
+                    <div class="info-card full-width">
+                        <h3>🛠️ 프레임워크</h3>
+                        <div id="framework-list" class="framework-grid">로딩중...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/js/app.js?v=3"></script>
 </body>
 </html>
