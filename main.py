@@ -65,20 +65,23 @@ async def pump_control_callback(device: str, relay_num: int, state: bool):
 
 
 async def detection_loop():
-    """카메라 인식 루프"""
-    print("[Main] 인식 루프 시작")
+    """카메라 인식 루프 (비동기 최적화)"""
+    print("[Main] 인식 루프 시작 (비동기)")
+    loop = asyncio.get_event_loop()
+
     while True:
         try:
             if camera.is_running and detector.is_loaded:
                 frame = camera.get_frame()
                 if frame is not None:
-                    detection = detector.detect(frame)
-                    print(f"[YOLO] 추론 완료 - 결과: {detection}")
+                    # 블로킹 방지: 별도 스레드에서 YOLO 추론 실행
+                    detection = await loop.run_in_executor(None, detector.detect, frame)
+
                     if detection:
                         # 생장단계 업데이트
                         stable_stage = detector.get_stable_stage()
                         controller.set_stage(stable_stage)
-                        print(f"[YOLO] 인식됨: {stable_stage.value} ({detection.confidence:.1%})")
+                        print(f"[YOLO] 인식: {stable_stage.value} ({detection.confidence:.1%})")
 
                         # 클라이언트에 전송
                         await broadcast({
@@ -90,10 +93,8 @@ async def detection_loop():
                             "detection_count": len(detector.detection_history),
                             "targets": controller.get_targets()
                         })
-                    else:
-                        print("[YOLO] 인식된 객체 없음")
 
-            await asyncio.sleep(CAMERA_CONFIG.get("capture_interval", 5))
+            await asyncio.sleep(CAMERA_CONFIG.get("capture_interval", 0.5))
 
         except Exception as e:
             print(f"[Main] 인식 루프 오류: {e}")

@@ -1,6 +1,6 @@
 task: detect
 mode: train
-model: yolov8n.pt
+model: models/ginseng_base.pt
 data: data/training/data.yaml
 epochs: 50
 time: null

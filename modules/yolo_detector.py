@@ -112,15 +112,16 @@ class GinsengDetector:
             return False
 
     def detect(self, frame: np.ndarray) -> Optional[Detection]:
-        """프레임에서 모든 생장단계 인식 (MPS 가속)"""
+        """프레임에서 모든 생장단계 인식 (MPS 가속 + 최적화)"""
         if not self.is_loaded or self.model is None:
             return None
 
         try:
-            # M4 Mac MPS 가속 추론
+            # M4 Mac MPS 가속 추론 (최적화)
             results = self.model(
                 frame,
                 device=self.device,
+                imgsz=320,  # 320px로 빠른 추론 (640 대비 4배 빠름)
                 verbose=False
             )
 

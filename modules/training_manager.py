@@ -7,6 +7,7 @@ import os
 import shutil
 import asyncio
 import time
+import urllib.request
 from pathlib import Path
 from typing import Dict, List, Optional
 from dataclasses import dataclass, asdict
@@ -14,6 +15,9 @@ from datetime import datetime
 import json
 import cv2
 import numpy as np
+
+# GitHub 기본 모델 URL (terrawave/ginseng-sprout-detection)
+GITHUB_MODEL_URL = "https://raw.githubusercontent.com/terrawave/ginseng-sprout-detection/master/best.pt"
 
 
 @dataclass
@@ -82,6 +86,28 @@ class TrainingManager:
                 json.dump(data, f, ensure_ascii=False, indent=2)
         except Exception as e:
             print(f"[Training] 메타데이터 저장 실패: {e}")
+
+    def download_base_model(self) -> Optional[str]:
+        """GitHub에서 기본 모델 다운로드"""
+        try:
+            base_model_path = self.models_path / "ginseng_base.pt"
+            print(f"[Training] GitHub에서 기본 모델 다운로드 중...")
+            print(f"[Training] URL: {GITHUB_MODEL_URL}")
+
+            # 다운로드
+            urllib.request.urlretrieve(GITHUB_MODEL_URL, str(base_model_path))
+
+            # 파일 확인
+            if base_model_path.exists() and base_model_path.stat().st_size > 1000000:  # 1MB 이상
+                print(f"[Training] 기본 모델 다운로드 완료: {base_model_path}")
+                return str(base_model_path)
+            else:
+                print(f"[Training] 다운로드 실패 - 파일 크기 이상")
+                return None
+
+        except Exception as e:
+            print(f"[Training] GitHub 모델 다운로드 실패: {e}")
+            return None
 
     def capture_image(self, frame: np.ndarray) -> Optional[str]:
         """프레임 캡처 및 저장"""
@@ -288,12 +314,45 @@ names: {self.classes}
             from ultralytics import YOLO
             from ultralytics.utils import callbacks
 
-            # 베이스 모델 로드 (항상 새로운 pretrained 모델 사용)
-            # 기존 커스텀 모델은 클래스 수가 다를 수 있으므로 사용하지 않음
-            print(f"[Training] YOLOv8 pretrained 모델 로드: {base_model}")
-            model = YOLO(base_model)  # ultralytics에서 자동 다운로드
+            model = None
+            model_source = "none"
 
-            print(f"[Training] 학습 시작: epochs={epochs}, base={base_model}")
+            # 1. GitHub에서 기본 모델 다운로드 시도
+            github_model_path = self.download_base_model()
+            if github_model_path:
+                try:
+                    temp_model = YOLO(github_model_path)
+                    num_classes = len(temp_model.names)
+                    if num_classes == 3:  # 발아기, 생장기, 수확기
+                        model = temp_model
+                        model_source = "github"
+                        print(f"[Training] GitHub 모델로 파인튜닝: {github_model_path} (클래스 {num_classes}개)")
+                    else:
+                        print(f"[Training] GitHub 모델 클래스 수 불일치 ({num_classes}개)")
+                except Exception as e:
+                    print(f"[Training] GitHub 모델 로드 실패: {e}")
+
+            # 2. GitHub 실패 시 로컬 모델 사용
+            if model is None:
+                existing_model = Path("models/ginseng_growth.pt")
+                if existing_model.exists():
+                    try:
+                        temp_model = YOLO(str(existing_model))
+                        num_classes = len(temp_model.names)
+                        if num_classes == 3:
+                            model = temp_model
+                            model_source = "local"
+                            print(f"[Training] 로컬 모델로 파인튜닝: {existing_model} (클래스 {num_classes}개)")
+                    except Exception as e:
+                        print(f"[Training] 로컬 모델 로드 실패: {e}")
+
+            # 3. 모두 실패 시 YOLOv8n 사용
+            if model is None:
+                print(f"[Training] YOLOv8 pretrained 모델 로드: {base_model}")
+                model = YOLO(base_model)
+                model_source = "pretrained"
+
+            print(f"[Training] 학습 시작: epochs={epochs}, source={model_source}")
 
             # 진행 상황 추적을 위한 참조
             manager = self

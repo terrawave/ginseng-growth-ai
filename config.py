@@ -41,7 +41,7 @@ CAMERA_CONFIG = {
     "width": 640,
     "height": 480,
     "fps": 30,
-    "capture_interval": 3,  # 인식 간격 (초) - 3초마다 추론
+    "capture_interval": 0.5,  # 인식 간격 (초) - 0.5초마다 추론
 }
 
 # 제어 설정
